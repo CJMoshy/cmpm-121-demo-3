@@ -1,13 +1,9 @@
-// todo
 // @deno-types="npm:@types/leaflet@^1.9.14"
 
 import leaflet from "leaflet";
-
 import "leaflet/dist/leaflet.css";
 import "./style.css";
-
 import "./leafletWorkaround.ts";
-
 import luck from "./luck.ts";
 
 // define list of spawn points for player
@@ -45,8 +41,11 @@ const player = {
   marker: leaflet.marker(spawnLocations.OAKES_CLASSROOM),
 };
 
-const statusPanel = document.querySelector<HTMLDivElement>("#coins")!; // element `statusPanel` is defined in index.html
-statusPanel.innerHTML = "0...";
+// track caches we spawn
+const caches = new Map<string, number>();
+
+const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
+coinCountUI.innerHTML = "0...";
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
@@ -61,21 +60,26 @@ function spawnCache(i: number, j: number) {
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
 
+  // Each cache has a random point value, mutable by the player
+  const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+
+  //store info about cache so we can give it statefulness
+  caches.set(i.toString() + j.toString(), pointValue);
+
   // Handle interactions with the cache
   rect.bindPopup(() => {
-    // Each cache has a random point value, mutable by the player
-    let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
-
     // The popup offers a description and button
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
-                <div>Cache Location: "${i},${j}" Available coins: <span id="value">${pointValue}</span></div>
+                <div>Cache Location: "${i},${j}" Available coins: <span id="value">${
+      (caches.get(i.toString() + j.toString())!).toString()
+    }</span></div>
                 <button id="deposit">deposit coins</button> <button id="withdrawal">withdrawl coins</button>`;
 
     const updateUserCoinView = () => {
-      popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML = pointValue
-        .toString();
-      statusPanel.innerHTML = `${player.coins}`;
+      popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
+        (caches.get(i.toString() + j.toString())!).toString();
+      coinCountUI.innerHTML = `${player.coins}`;
     };
 
     // Clicking the button decrements the cache's value and increments the player's points
@@ -86,7 +90,10 @@ function spawnCache(i: number, j: number) {
           alert("You dont have any coins to deposit!");
           return;
         }
-        pointValue++;
+        caches.set(
+          i.toString() + j.toString(),
+          caches.get(i.toString() + j.toString())! + 1,
+        );
         player.coins--;
         updateUserCoinView();
       });
@@ -97,7 +104,10 @@ function spawnCache(i: number, j: number) {
           alert("This cache has no coins to withdrawal!");
           return;
         }
-        pointValue--;
+        caches.set(
+          i.toString() + j.toString(),
+          caches.get(i.toString() + j.toString())! - 1,
+        );
         player.coins++;
         updateUserCoinView();
       });
