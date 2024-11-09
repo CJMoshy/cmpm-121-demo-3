@@ -8,6 +8,7 @@ import luck from "./luck.ts";
 
 // define list of spawn points for player
 const spawnLocations = {
+  NULL_ISLAND: leaflet.latLng(0, 0),
   OAKES_CLASSROOM: leaflet.latLng(36.98949379578401, -122.06277128548504),
 };
 
@@ -36,13 +37,15 @@ leaflet
   })
   .addTo(map);
 
-const player = {
+const player: Player = {
   coins: 0,
   marker: leaflet.marker(spawnLocations.OAKES_CLASSROOM),
+  inventory: [],
 };
 
 // track caches we spawn
-const caches = new Map<string, number>();
+const caches = new Map<Hash, number>(); // caches we generate
+const depositBox = new Map<Hash, DepositBox>();
 
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
 coinCountUI.innerHTML = "0...";
@@ -63,26 +66,34 @@ function spawnCache(i: number, j: number) {
   // Each cache has a random point value, mutable by the player
   const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
 
-  //store info about cache so we can give it statefulness
-  caches.set(i.toString() + j.toString(), pointValue);
+  //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
+  const IHASH: Hash = (bounds.getCenter().lat / TILE_DEGREES).toString();
+  const JHASH: Hash = (bounds.getCenter().lng / TILE_DEGREES).toString();
+  const hash: Hash = IHASH + JHASH;
+  if (caches.has(hash) === false) {
+    caches.set(hash, pointValue);
+  }
 
   // Handle interactions with the cache
   rect.bindPopup(() => {
     // The popup offers a description and button
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
-                <div>Cache Location: "${i},${j}" Available coins: <span id="value">${
-      (caches.get(i.toString() + j.toString())!).toString()
-    }</span></div>
-                <button id="deposit">deposit coins</button> <button id="withdrawal">withdrawl coins</button>`;
+                <div>Cache Location: "${i},${j}" Available coins to mint: <span id="value">${
+      (caches.get(hash)!).toString()
+    }</span></div><div>Available Unique Tokens: ${
+      depositBox.get(hash)?.length || 0
+    }</div>
+                <button id="deposit">deposit coins</button> <button id="withdrawal">withdrawl coins</button><button id="generate">Generate New Token</button>`;
 
     const updateUserCoinView = () => {
       popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-        (caches.get(i.toString() + j.toString())!).toString();
+        (caches.get(hash)!).toString();
       coinCountUI.innerHTML = `${player.coins}`;
     };
 
     // Clicking the button decrements the cache's value and increments the player's points
+    let UUID = 0;
     popupDiv
       .querySelector<HTMLButtonElement>("#deposit")!
       .addEventListener("click", () => {
@@ -90,25 +101,49 @@ function spawnCache(i: number, j: number) {
           alert("You dont have any coins to deposit!");
           return;
         }
-        caches.set(
-          i.toString() + j.toString(),
-          caches.get(i.toString() + j.toString())! + 1,
-        );
+        if (!depositBox.has(hash)) {
+          depositBox.set(
+            hash,
+            [player.inventory.pop()!],
+          );
+        } else {
+          const token: NFT = player.inventory.pop()!;
+          const dBox = depositBox.get(hash)!;
+          dBox?.push(token);
+          depositBox.set(hash, dBox);
+        }
         player.coins--;
+        console.log(depositBox.get(hash));
         updateUserCoinView();
       });
+    popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
+      .addEventListener("click", () => {
+        const dBox = depositBox.get(hash);
+        if (dBox !== undefined && dBox.length > 0) {
+          player.inventory.push(dBox.pop()!);
+          depositBox.set(hash, dBox);
+          player.coins++;
+          updateUserCoinView();
+          console.log(player.inventory);
+        } else if (dBox === undefined || dBox.length === 0) {
+          alert("no tokens in this cache storage");
+        }
+      });
     popupDiv
-      .querySelector<HTMLButtonElement>("#withdrawal")!
+      .querySelector<HTMLButtonElement>("#generate")!
       .addEventListener("click", () => {
         if (pointValue <= 0) {
-          alert("This cache has no coins to withdrawal!");
+          alert("This cache cannot generate any more tokesn!");
           return;
         }
         caches.set(
-          i.toString() + j.toString(),
-          caches.get(i.toString() + j.toString())! - 1,
+          hash,
+          caches.get(hash)! - 1,
         );
         player.coins++;
+        player.inventory.push({ i: IHASH, j: JHASH, serial: UUID });
+        UUID++;
+        console.log(player.inventory);
         updateUserCoinView();
       });
 
