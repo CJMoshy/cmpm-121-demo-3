@@ -79,8 +79,11 @@ function spawnCache(i: number, j: number) {
     // The popup offers a description and button
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
+    <div id='wrapper'>
       <div>
-        Cache Location: "${i},${j}" Available coins to mint: 
+        Cache Location: "${i},${j}" 
+        <br>
+        Available Tokens for Mint: 
         <span id="value">
           ${(caches.get(hash)!).toString()}
         </span>
@@ -90,9 +93,10 @@ function spawnCache(i: number, j: number) {
         ${depositBox.get(hash)?.length || 0}
         </span>
       </div>
-      <button id="deposit">deposit coins</button> 
-      <button id="withdrawal">withdrawl coins</button>
+      <button id="deposit">Deposit Token</button> <br>
+      <button id="withdrawal">Withdrawl token</button> <br>
       <button id="generate">Generate New Token</button>
+    </div>
     `;
 
     const updateUserCoinView = () => {
@@ -109,7 +113,7 @@ function spawnCache(i: number, j: number) {
       .querySelector<HTMLButtonElement>("#deposit")!
       .addEventListener("click", () => {
         if (player.coins <= 0) {
-          alert("You dont have any coins to deposit!");
+          alert("No Token in Inventory");
           return;
         }
         if (!depositBox.has(hash)) {
@@ -124,7 +128,6 @@ function spawnCache(i: number, j: number) {
           depositBox.set(hash, dBox);
         }
         player.coins--;
-        console.log(depositBox.get(hash));
         updateUserCoinView();
       });
     popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
@@ -135,16 +138,15 @@ function spawnCache(i: number, j: number) {
           depositBox.set(hash, dBox);
           player.coins++;
           updateUserCoinView();
-          console.log(player.inventory);
-        } else if (dBox === undefined || dBox.length === 0) {
-          alert("no tokens in this cache storage");
+        } else {
+          alert("No Token in Cache");
         }
       });
     popupDiv
       .querySelector<HTMLButtonElement>("#generate")!
       .addEventListener("click", () => {
         if (caches.get(hash)! <= 0) {
-          alert("This cache cannot generate any more tokens!");
+          alert("No Tokens Available for Mint");
           return;
         }
         caches.set(
