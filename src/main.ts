@@ -59,11 +59,19 @@ function spawnCache(i: number, j: number) {
     [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
   ]);
 
-  // Add a rectangle to the map to represent the cache
-  const rect = leaflet.rectangle(bounds);
+  const randomColor = () => (
+    "#" +
+    Array.from(
+      { length: 6 },
+      () => "0123456789ABCDEF"[Math.floor(Math.random() * 16)],
+    ).join("")
+  );
+  const rect = leaflet.rectangle(bounds, {
+    color: randomColor(),
+  });
   rect.addTo(map);
 
-  // Each cache has a random point value, mutable by the player
+  // Each cache has a random point value
   const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
@@ -81,7 +89,7 @@ function spawnCache(i: number, j: number) {
     popupDiv.innerHTML = `
     <div id='wrapper'>
       <div>
-        Cache Location: "${i},${j}" 
+        Cache Location: "${IHASH},${JHASH}" 
         <br>
         Available Tokens for Mint: 
         <span id="value">
@@ -154,7 +162,9 @@ function spawnCache(i: number, j: number) {
           caches.get(hash)! - 1,
         );
         player.coins++;
-        player.inventory.push({ i: IHASH, j: JHASH, serial: UUID });
+        const nft: NFT = { i: IHASH, j: JHASH, serial: UUID };
+        console.log("generated a new token", nft);
+        player.inventory.push(nft);
         UUID++;
         updateUserCoinView();
       });
