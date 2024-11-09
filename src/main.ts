@@ -38,14 +38,13 @@ leaflet
   .addTo(map);
 
 const player: Player = {
-  coins: 0,
   marker: leaflet.marker(spawnLocations.OAKES_CLASSROOM),
   inventory: [],
 };
 
 // track caches we spawn
-const caches = new Map<Hash, number>(); // caches we generate
-const depositBox = new Map<Hash, DepositBox>();
+const caches = new Set<CellHash>(); // caches we generate
+const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
 
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
 coinCountUI.innerHTML = "0...";
@@ -59,6 +58,7 @@ function spawnCache(i: number, j: number) {
     [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
   ]);
 
+  // brace made me this... generate random color hex
   const randomColor = () => (
     "#" +
     Array.from(
@@ -71,20 +71,20 @@ function spawnCache(i: number, j: number) {
   });
   rect.addTo(map);
 
-  // Each cache has a random point value
-  const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
+  // point value determines how many NFTs each cache can 'mint' or create
+  let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
-  const IHASH: Hash = (bounds.getCenter().lat / TILE_DEGREES).toString();
-  const JHASH: Hash = (bounds.getCenter().lng / TILE_DEGREES).toString();
-  const hash: Hash = IHASH + JHASH;
-  if (caches.has(hash) === false) {
-    caches.set(hash, pointValue);
+  const IHASH: CellHash = (bounds.getCenter().lat / TILE_DEGREES).toString();
+  const JHASH: CellHash = (bounds.getCenter().lng / TILE_DEGREES).toString();
+  const HASH: CellHash = IHASH + JHASH;
+  if (caches.has(HASH) === false) {
+    caches.add(HASH);
   }
 
   // Handle interactions with the cache
   rect.bindPopup(() => {
-    // The popup offers a description and button
+    // The popup offers a description and buttons
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
     <div id='wrapper'>
@@ -93,12 +93,12 @@ function spawnCache(i: number, j: number) {
         <br>
         Available Tokens for Mint: 
         <span id="value">
-          ${(caches.get(hash)!).toString()}
+          ${pointValue.toString()}
         </span>
       </div>
       <div>Available Unique Tokens: 
         <span id='tokens'>
-        ${depositBox.get(hash)?.length || 0}
+        ${depositBox.get(HASH)?.length || 0}
         </span>
       </div>
       <button id="deposit">Deposit Token</button> <br>
@@ -107,44 +107,45 @@ function spawnCache(i: number, j: number) {
     </div>
     `;
 
+    // helper to update the ui
     const updateUserCoinView = () => {
-      popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-        (caches.get(hash)!).toString();
+      popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML = pointValue
+        .toString();
+
       popupDiv.querySelector<HTMLSpanElement>("#tokens")!.innerHTML =
-        (depositBox.get(hash)?.length)?.toString() || "0";
-      coinCountUI.innerHTML = `${player.coins}`;
+        (depositBox.get(HASH)?.length)?.toString() || "0";
+
+      coinCountUI.innerHTML = `${player.inventory.length}`;
     };
 
-    // Clicking the button decrements the cache's value and increments the player's points
+    // define a unique id to assign to each coin generated
     let UUID = 0;
     popupDiv
-      .querySelector<HTMLButtonElement>("#deposit")!
+      .querySelector<HTMLButtonElement>("#deposit")! //
       .addEventListener("click", () => {
-        if (player.coins <= 0) {
+        if (player.inventory.length <= 0) {
           alert("No Token in Inventory");
           return;
         }
-        if (!depositBox.has(hash)) {
+        if (!depositBox.has(HASH)) { // check if the hash does not have a deposit box already
           depositBox.set(
-            hash,
+            HASH,
             [player.inventory.pop()!],
           );
         } else {
-          const token: NFT = player.inventory.pop()!;
-          const dBox = depositBox.get(hash)!;
+          const token: NFT = player.inventory.pop()!; // add players most recent token to the cache
+          const dBox = depositBox.get(HASH)!;
           dBox?.push(token);
-          depositBox.set(hash, dBox);
+          depositBox.set(HASH, dBox);
         }
-        player.coins--;
         updateUserCoinView();
       });
     popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
       .addEventListener("click", () => {
-        const dBox = depositBox.get(hash);
-        if (dBox !== undefined && dBox.length > 0) {
-          player.inventory.push(dBox.pop()!);
-          depositBox.set(hash, dBox);
-          player.coins++;
+        const dBox = depositBox.get(HASH);
+        if (dBox !== undefined && dBox.length > 0) { // if tokens exist in this caches deposit box
+          player.inventory.push(dBox.pop()!); // give player a token
+          depositBox.set(HASH, dBox);
           updateUserCoinView();
         } else {
           alert("No Token in Cache");
@@ -153,19 +154,15 @@ function spawnCache(i: number, j: number) {
     popupDiv
       .querySelector<HTMLButtonElement>("#generate")!
       .addEventListener("click", () => {
-        if (caches.get(hash)! <= 0) {
+        if (pointValue! <= 0) { // can this cache still mint?
           alert("No Tokens Available for Mint");
           return;
         }
-        caches.set(
-          hash,
-          caches.get(hash)! - 1,
-        );
-        player.coins++;
+        pointValue--; // mint one
         const nft: NFT = { i: IHASH, j: JHASH, serial: UUID };
         console.log("generated a new token", nft);
         player.inventory.push(nft);
-        UUID++;
+        UUID++; // increment id for next mint
         updateUserCoinView();
       });
 

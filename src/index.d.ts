@@ -4,12 +4,12 @@ interface NFT {
   serial: number;
 }
 
-type Hash = string;
+type CellHash = string;
+
 type Inventory = NFT[];
-type DepositBox = NFT[]; // stack
+type DepositBox = NFT[];
 
 interface Player {
-  coins: number;
   //deno-lint-ignore no-explicit-any
   marker: any; // leaflet types not exist
   inventory: Inventory;
