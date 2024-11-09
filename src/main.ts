@@ -64,7 +64,7 @@ function spawnCache(i: number, j: number) {
   rect.addTo(map);
 
   // Each cache has a random point value, mutable by the player
-  const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+  const pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
   const IHASH: Hash = (bounds.getCenter().lat / TILE_DEGREES).toString();
@@ -79,16 +79,27 @@ function spawnCache(i: number, j: number) {
     // The popup offers a description and button
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
-                <div>Cache Location: "${i},${j}" Available coins to mint: <span id="value">${
-      (caches.get(hash)!).toString()
-    }</span></div><div>Available Unique Tokens: ${
-      depositBox.get(hash)?.length || 0
-    }</div>
-                <button id="deposit">deposit coins</button> <button id="withdrawal">withdrawl coins</button><button id="generate">Generate New Token</button>`;
+      <div>
+        Cache Location: "${i},${j}" Available coins to mint: 
+        <span id="value">
+          ${(caches.get(hash)!).toString()}
+        </span>
+      </div>
+      <div>Available Unique Tokens: 
+        <span id='tokens'>
+        ${depositBox.get(hash)?.length || 0}
+        </span>
+      </div>
+      <button id="deposit">deposit coins</button> 
+      <button id="withdrawal">withdrawl coins</button>
+      <button id="generate">Generate New Token</button>
+    `;
 
     const updateUserCoinView = () => {
       popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
         (caches.get(hash)!).toString();
+      popupDiv.querySelector<HTMLSpanElement>("#tokens")!.innerHTML =
+        (depositBox.get(hash)?.length)?.toString() || "0";
       coinCountUI.innerHTML = `${player.coins}`;
     };
 
@@ -132,8 +143,8 @@ function spawnCache(i: number, j: number) {
     popupDiv
       .querySelector<HTMLButtonElement>("#generate")!
       .addEventListener("click", () => {
-        if (pointValue <= 0) {
-          alert("This cache cannot generate any more tokesn!");
+        if (caches.get(hash)! <= 0) {
+          alert("This cache cannot generate any more tokens!");
           return;
         }
         caches.set(
@@ -143,7 +154,6 @@ function spawnCache(i: number, j: number) {
         player.coins++;
         player.inventory.push({ i: IHASH, j: JHASH, serial: UUID });
         UUID++;
-        console.log(player.inventory);
         updateUserCoinView();
       });
 
