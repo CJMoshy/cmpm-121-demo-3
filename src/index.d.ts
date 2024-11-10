@@ -1,10 +1,15 @@
+type CellHash = string;
+
+interface Cell {
+  readonly i: number;
+  readonly j: number;
+}
+
 interface NFT {
   i: string;
   j: string;
   serial: number;
 }
-
-type CellHash = string;
 
 type Inventory = NFT[];
 type DepositBox = NFT[];

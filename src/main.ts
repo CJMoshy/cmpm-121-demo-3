@@ -43,7 +43,7 @@ const player: Player = {
 };
 
 // track caches we spawn
-const caches = new Set<CellHash>(); // caches we generate
+const caches = new Map<CellHash, Cell>(); // caches we generate
 const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
 
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
@@ -75,11 +75,15 @@ function spawnCache(i: number, j: number) {
   let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
-  const IHASH: CellHash = (bounds.getCenter().lat / TILE_DEGREES).toString();
-  const JHASH: CellHash = (bounds.getCenter().lng / TILE_DEGREES).toString();
-  const HASH: CellHash = IHASH + JHASH;
+  const IHASH = bounds.getCenter().lat / TILE_DEGREES;
+  const JHASH = bounds.getCenter().lng / TILE_DEGREES;
+  const HASH = IHASH.toString() + JHASH.toString();
+  const CELL: Cell = {
+    i: IHASH,
+    j: JHASH,
+  };
   if (caches.has(HASH) === false) {
-    caches.add(HASH);
+    caches.set(HASH, CELL);
   }
 
   // Handle interactions with the cache
@@ -96,7 +100,8 @@ function spawnCache(i: number, j: number) {
           ${pointValue.toString()}
         </span>
       </div>
-      <div>Available Unique Tokens: 
+      <div>
+        Available Unique Tokens: 
         <span id='tokens'>
         ${depositBox.get(HASH)?.length || 0}
         </span>
@@ -159,7 +164,11 @@ function spawnCache(i: number, j: number) {
           return;
         }
         pointValue--; // mint one
-        const nft: NFT = { i: IHASH, j: JHASH, serial: UUID };
+        const nft: NFT = {
+          i: IHASH.toString(),
+          j: JHASH.toString(),
+          serial: UUID,
+        };
         console.log("generated a new token", nft);
         player.inventory.push(nft);
         UUID++; // increment id for next mint
