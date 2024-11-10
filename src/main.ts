@@ -52,7 +52,7 @@ coinCountUI.innerHTML = "0...";
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
   // Convert cell numbers into lat/lng bounds
-  const origin = spawnLocations.OAKES_CLASSROOM;
+  const origin = player.marker.getLatLng();
   const bounds = leaflet.latLngBounds([
     [origin.lat + i * TILE_DEGREES, origin.lng + j * TILE_DEGREES],
     [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
@@ -179,13 +179,7 @@ function spawnCache(i: number, j: number) {
   });
 }
 
-function main() {
-  // here is where we would load stuff from local storage
-
-  //  then we can set player and go!
-  player.marker.bindTooltip("You are here!");
-  player.marker.addTo(map);
-
+function generateCache() {
   // Look around the player's neighborhood for caches to spawn
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
@@ -195,6 +189,50 @@ function main() {
       }
     }
   }
+}
+
+document.getElementById("up")?.addEventListener("click", () => {
+  movePlayerCommand("up");
+});
+
+document.getElementById("down")?.addEventListener("click", () => {
+  movePlayerCommand("down");
+});
+
+document.getElementById("left")?.addEventListener("click", () => {
+  movePlayerCommand("left");
+});
+
+document.getElementById("right")?.addEventListener("click", () => {
+  movePlayerCommand("right");
+});
+
+function movePlayerCommand(direction: MoveCommand) {
+  const { lat, lng } = player.marker.getLatLng();
+  switch (direction) {
+    case "up":
+      player.marker.setLatLng(leaflet.latLng(lat + TILE_DEGREES, lng));
+      break;
+    case "down":
+      player.marker.setLatLng(leaflet.latLng(lat - TILE_DEGREES, lng));
+      break;
+    case "left":
+      player.marker.setLatLng(leaflet.latLng(lat, lng - TILE_DEGREES));
+      break;
+    case "right":
+      player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
+      break;
+  }
+  // generateCache();
+}
+
+function main() {
+  // here is where we would load stuff from local storage
+
+  //  then we can set player and go!
+  player.marker.bindTooltip("You are here!");
+  player.marker.addTo(map);
+  generateCache();
 }
 
 main();

@@ -57,15 +57,12 @@ h1 {
 }
 
 button {
-  margin: 2px;
-  color: green;
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -99,4 +96,18 @@ button:focus-visible {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  text-align: center;
+}
+#inventory {
+  border: 5px solid black;
+  margin: 5px;
+  text-align: center;
+}
+.controls {
+  display: flex;
+  justify-content: space-between;
+}
+
+.moveBtn {
+  font-size: 20px;
 }

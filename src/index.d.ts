@@ -1,5 +1,5 @@
 type CellHash = string;
-
+type MoveCommand = "up" | "down" | "left" | "right";
 interface Cell {
   readonly i: number;
   readonly j: number;
