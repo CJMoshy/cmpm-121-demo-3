@@ -42,6 +42,7 @@ leaflet
 const player: Player = {
   marker: leaflet.marker(spawnLocations.OAKES_CLASSROOM),
   inventory: [],
+  step: 0,
 };
 
 // track caches we spawn
@@ -74,7 +75,7 @@ function spawnCache(i: number, j: number) {
   rect.addTo(cachePopups);
 
   // point value determines how many NFTs each cache can 'mint' or create
-  let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
+  let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1;
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
   const IHASH = bounds.getCenter().lat / TILE_DEGREES;
@@ -86,6 +87,8 @@ function spawnCache(i: number, j: number) {
   };
   if (caches.has(HASH) === false) {
     caches.set(HASH, CELL);
+  } else {
+    console.log("Cache already exists in memory!");
   }
 
   // Handle interactions with the cache
@@ -186,7 +189,12 @@ function generateCache() {
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
       // If location i,j is lucky enough, spawn a cache!
-      if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
+      if (
+        luck(
+          [i + player.marker.getLatLng().lat, j + player.marker.getLatLng().lat]
+            .toString(),
+        ) < CACHE_SPAWN_PROBABILITY
+      ) {
         spawnCache(i, j);
       }
     }
@@ -225,8 +233,12 @@ function movePlayerCommand(direction: MoveCommand) {
       player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
       break;
   }
-  cachePopups.clearLayers();
-  generateCache();
+  player.step++;
+  if (player.step >= 5) {
+    cachePopups.clearLayers();
+    generateCache();
+    player.step = 0;
+  }
   map.panTo(player.marker.getLatLng());
 }
 

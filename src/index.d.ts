@@ -18,4 +18,5 @@ interface Player {
   //deno-lint-ignore no-explicit-any
   marker: any; // leaflet types not exist
   inventory: Inventory;
+  step: number;
 }
