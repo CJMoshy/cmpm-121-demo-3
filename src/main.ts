@@ -28,6 +28,8 @@ const map = leaflet.map(document.getElementById("map")!, {
   scrollWheelZoom: false,
 });
 
+const cachePopups = leaflet.layerGroup().addTo(map);
+
 // Populate the map with a background tile layer
 leaflet
   .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -69,7 +71,7 @@ function spawnCache(i: number, j: number) {
   const rect = leaflet.rectangle(bounds, {
     color: randomColor(),
   });
-  rect.addTo(map);
+  rect.addTo(cachePopups);
 
   // point value determines how many NFTs each cache can 'mint' or create
   let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25);
@@ -223,7 +225,9 @@ function movePlayerCommand(direction: MoveCommand) {
       player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
       break;
   }
-  // generateCache();
+  cachePopups.clearLayers();
+  generateCache();
+  map.panTo(player.marker.getLatLng());
 }
 
 function main() {
