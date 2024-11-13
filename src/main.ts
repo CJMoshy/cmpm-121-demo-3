@@ -11,16 +11,17 @@ const spawnLocations = {
   NULL_ISLAND: leaflet.latLng(0, 0),
   OAKES_CLASSROOM: leaflet.latLng(36.98949379578401, -122.06277128548504),
 };
+const SPAWN = spawnLocations.NULL_ISLAND;
 
 // Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const NEIGHBORHOOD_SIZE = 8;
-const CACHE_SPAWN_PROBABILITY = 0.1;
+const CACHE_SPAWN_PROBABILITY = 0.05;
 
 // create the map with leaflet
 const map = leaflet.map(document.getElementById("map")!, {
-  center: spawnLocations.OAKES_CLASSROOM,
+  center: SPAWN,
   zoom: GAMEPLAY_ZOOM_LEVEL,
   minZoom: GAMEPLAY_ZOOM_LEVEL,
   maxZoom: GAMEPLAY_ZOOM_LEVEL,
@@ -28,7 +29,8 @@ const map = leaflet.map(document.getElementById("map")!, {
   scrollWheelZoom: false,
 });
 
-const cachePopups = leaflet.layerGroup().addTo(map);
+// this is a layer group that will hold all the l.rect instances...
+const cachePopups: leaflet.LayerGroup[] = [];
 
 // Populate the map with a background tile layer
 leaflet
@@ -40,9 +42,13 @@ leaflet
   .addTo(map);
 
 const player: Player = {
-  marker: leaflet.marker(spawnLocations.OAKES_CLASSROOM),
+  marker: leaflet.marker(SPAWN),
   inventory: [],
   step: 0,
+  location: {
+    current: SPAWN,
+    previous: SPAWN,
+  },
 };
 
 // track caches we spawn
@@ -58,21 +64,21 @@ function spawnCache(i: number, j: number) {
   const origin = player.marker.getLatLng();
   const bounds = leaflet.latLngBounds([
     [origin.lat + i * TILE_DEGREES, origin.lng + j * TILE_DEGREES],
-    [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
+    [origin.lat + (i - 1) * TILE_DEGREES, origin.lng + (j - 1) * TILE_DEGREES],
   ]);
 
+  // console.log(bounds.getNorth().toString())
   // brace made me this... generate random color hex
   const randomColor = () => (
     "#" +
     Array.from(
       { length: 6 },
-      () => "0123456789ABCDEF"[Math.floor(Math.random() * 16)],
+      () => "0123456789ABCDEF"[Math.floor(luck([i, j].toString()) * 16)],
     ).join("")
   );
   const rect = leaflet.rectangle(bounds, {
     color: randomColor(),
   });
-  rect.addTo(cachePopups);
 
   // point value determines how many NFTs each cache can 'mint' or create
   let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1;
@@ -81,12 +87,13 @@ function spawnCache(i: number, j: number) {
   const IHASH = bounds.getCenter().lat / TILE_DEGREES;
   const JHASH = bounds.getCenter().lng / TILE_DEGREES;
   const HASH = IHASH.toString() + JHASH.toString();
-  const CELL: Cell = {
-    i: IHASH,
-    j: JHASH,
-  };
+
   if (caches.has(HASH) === false) {
-    caches.set(HASH, CELL);
+    const cell = {
+      i: IHASH,
+      j: JHASH,
+    };
+    caches.set(HASH, cell);
   } else {
     console.log("Cache already exists in memory!");
   }
@@ -98,7 +105,7 @@ function spawnCache(i: number, j: number) {
     popupDiv.innerHTML = `
     <div id='wrapper'>
       <div>
-        Cache Location: "${IHASH},${JHASH}" 
+        Cache Location: ${IHASH.toFixed(2)} lat  ${JHASH.toFixed(2)} lng
         <br>
         Available Tokens for Mint: 
         <span id="value">
@@ -174,7 +181,7 @@ function spawnCache(i: number, j: number) {
           j: JHASH.toString(),
           serial: UUID,
         };
-        console.log("generated a new token", nft);
+        // console.log("generated a new token", nft);
         player.inventory.push(nft);
         UUID++; // increment id for next mint
         updateUserCoinView();
@@ -182,9 +189,12 @@ function spawnCache(i: number, j: number) {
 
     return popupDiv;
   });
+  return rect;
 }
 
 function generateCache() {
+  const layer = leaflet.layerGroup<leaflet.Rectangle>();
+  layer.addTo(map);
   // Look around the player's neighborhood for caches to spawn
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
@@ -195,9 +205,15 @@ function generateCache() {
             .toString(),
         ) < CACHE_SPAWN_PROBABILITY
       ) {
-        spawnCache(i, j);
+        const rect = spawnCache(i, j);
+        rect.addTo(layer);
       }
     }
+  }
+  cachePopups.push(layer);
+  if (cachePopups.length > 3) {
+    const del = cachePopups.shift() as leaflet.LayerGroup;
+    del.clearLayers();
   }
 }
 
@@ -222,22 +238,39 @@ function movePlayerCommand(direction: MoveCommand) {
   switch (direction) {
     case "up":
       player.marker.setLatLng(leaflet.latLng(lat + TILE_DEGREES, lng));
+      player.location.current = player.marker.getLatLng();
       break;
     case "down":
       player.marker.setLatLng(leaflet.latLng(lat - TILE_DEGREES, lng));
+      player.location.current = player.marker.getLatLng();
       break;
     case "left":
       player.marker.setLatLng(leaflet.latLng(lat, lng - TILE_DEGREES));
+      player.location.current = player.marker.getLatLng();
       break;
     case "right":
       player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
+      player.location.current = player.marker.getLatLng();
       break;
   }
-  player.step++;
-  if (player.step >= 5) {
-    cachePopups.clearLayers();
+
+  const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
+    const xDiff = x2 - x1;
+    const yDiff = y2 - y1;
+    return Number(Math.sqrt(xDiff * xDiff + yDiff * yDiff).toFixed(5));
+  };
+
+  const { current, previous } = player.location;
+  const dist = getDistance(
+    current.lat,
+    current.lng,
+    previous.lat,
+    previous.lng,
+  );
+  if (dist > 0.0005) {
+    previous.lat = current.lat;
+    previous.lng = current.lng;
     generateCache();
-    player.step = 0;
   }
   map.panTo(player.marker.getLatLng());
 }

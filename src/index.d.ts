@@ -1,22 +1,29 @@
-type CellHash = string;
-type MoveCommand = "up" | "down" | "left" | "right";
-interface Cell {
-  readonly i: number;
-  readonly j: number;
-}
+import { LatLng, Marker } from "types/leaflet";
 
-interface NFT {
-  i: string;
-  j: string;
-  serial: number;
-}
+declare global {
+  type CellHash = string;
+  interface Cell {
+    readonly i: number;
+    readonly j: number;
+  }
 
-type Inventory = NFT[];
-type DepositBox = NFT[];
+  interface NFT {
+    i: string;
+    j: string;
+    serial: number;
+  }
+  type Inventory = NFT[];
+  type DepositBox = NFT[];
 
-interface Player {
-  //deno-lint-ignore no-explicit-any
-  marker: any; // leaflet types not exist
-  inventory: Inventory;
-  step: number;
+  interface Player {
+    marker: Marker;
+    inventory: Inventory;
+    step: number;
+    location: {
+      current: LatLng;
+      previous: LatLng;
+    };
+  }
+
+  type MoveCommand = "up" | "down" | "left" | "right";
 }
