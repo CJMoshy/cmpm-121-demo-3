@@ -29,9 +29,6 @@ const map = leaflet.map(document.getElementById("map")!, {
   scrollWheelZoom: false,
 });
 
-// this is a layer group that will hold all the l.rect instances...
-const cachePopups: leaflet.LayerGroup[] = [];
-
 // Populate the map with a background tile layer
 leaflet
   .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -54,6 +51,8 @@ const player: Player = {
 // track caches we spawn
 const caches = new Map<CellHash, Cell>(); // caches we generate
 const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
+// this is a layer group that will hold all the l.rect instances...
+const cachePopups: leaflet.LayerGroup[] = [];
 
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
 coinCountUI.innerHTML = "0...";
@@ -211,27 +210,11 @@ function generateCache() {
     }
   }
   cachePopups.push(layer);
-  if (cachePopups.length > 3) {
+  if (cachePopups.length > 2) {
     const del = cachePopups.shift() as leaflet.LayerGroup;
     del.clearLayers();
   }
 }
-
-document.getElementById("up")?.addEventListener("click", () => {
-  movePlayerCommand("up");
-});
-
-document.getElementById("down")?.addEventListener("click", () => {
-  movePlayerCommand("down");
-});
-
-document.getElementById("left")?.addEventListener("click", () => {
-  movePlayerCommand("left");
-});
-
-document.getElementById("right")?.addEventListener("click", () => {
-  movePlayerCommand("right");
-});
 
 function movePlayerCommand(direction: MoveCommand) {
   const { lat, lng } = player.marker.getLatLng();
@@ -254,6 +237,7 @@ function movePlayerCommand(direction: MoveCommand) {
       break;
   }
 
+  // derived from formula d = sqrt((x2-x1)^2 + (y2-y1)^2)
   const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
     const xDiff = x2 - x1;
     const yDiff = y2 - y1;
@@ -274,6 +258,22 @@ function movePlayerCommand(direction: MoveCommand) {
   }
   map.panTo(player.marker.getLatLng());
 }
+
+document.getElementById("up")?.addEventListener("click", () => {
+  movePlayerCommand("up");
+});
+
+document.getElementById("down")?.addEventListener("click", () => {
+  movePlayerCommand("down");
+});
+
+document.getElementById("left")?.addEventListener("click", () => {
+  movePlayerCommand("left");
+});
+
+document.getElementById("right")?.addEventListener("click", () => {
+  movePlayerCommand("right");
+});
 
 function main() {
   // here is where we would load stuff from local storage
