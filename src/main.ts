@@ -42,22 +42,24 @@ leaflet
 // const caches = new Map<CellHash, Cell>(); // caches we generate
 // const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
 const [caches, depositBox, inv, location] = loadFromLocalStorage();
+
 // this is a layer group that will hold all the l.rect instances...
 const cachePopups: leaflet.LayerGroup[] = [];
 
 const player: Player = {
   marker: leaflet.marker(location.current),
+  line: leaflet.polyline([location.current], { color: "blue" }).addTo(map),
   inventory: inv,
-  location: location
+  location: location,
 };
 
 // simple ui stuff for user
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
-coinCountUI.innerHTML = "0...";
+coinCountUI.innerHTML = player.inventory.length.toString();
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
-  console.log('sapwning')
+  console.log("sapwning");
   // Convert cell numbers into lat/lng bounds
   const origin = player.marker.getLatLng();
   const bounds = leaflet.latLngBounds([
@@ -172,7 +174,7 @@ function spawnCache(i: number, j: number) {
           updateUserCoinView();
           document.getElementById("recent")!.textContent =
             `Player withdrew token: {${token.i}:${token.j}:${token.serial}}`;
-            saveToLocalStorage()
+          saveToLocalStorage();
         } else {
           alert("No Token in Cache");
         }
@@ -196,7 +198,7 @@ function spawnCache(i: number, j: number) {
         player.inventory.push(nft);
         UUID++; // increment id for next mint
         updateUserCoinView();
-        saveToLocalStorage()
+        saveToLocalStorage();
       });
 
     return popupDiv;
@@ -269,23 +271,27 @@ function movePlayerCommand(direction: MoveCommand) {
     previous.lng = current.lng;
     generateCache();
   }
+  player.line.addLatLng(player.location.current);
   map.panTo(player.marker.getLatLng());
 }
 
 function saveToLocalStorage() {
-  console.log('saving to local storage')
-  console.log(JSON.stringify(Array.from(caches.entries())))
+  console.log("saving to local storage");
+  console.log(JSON.stringify(Array.from(caches.entries())));
   localStorage.setItem("cache", JSON.stringify(Array.from(caches.entries())));
-  localStorage.setItem("depositBox", JSON.stringify(Array.from(depositBox.entries())));
+  localStorage.setItem(
+    "depositBox",
+    JSON.stringify(Array.from(depositBox.entries())),
+  );
   localStorage.setItem("inventory", JSON.stringify(player.inventory));
-  localStorage.setItem('location', JSON.stringify(player.location))
+  localStorage.setItem("location", JSON.stringify(player.location));
 }
 
 function loadFromLocalStorage(): [
   Map<CellHash, Cell>,
   Map<CellHash, DepositBox>,
   Inventory,
-  PlayerLocation
+  PlayerLocation,
 ] {
   let caches = new Map<CellHash, Cell>(); // caches we generate
   let depositBox = new Map<CellHash, DepositBox>(); // e
@@ -298,11 +304,11 @@ function loadFromLocalStorage(): [
   const savedCache = localStorage.getItem("cache");
   const savedDepositBox = localStorage.getItem("depositBox");
   const savedInventory = localStorage.getItem("inventory");
-  const savedLocation = localStorage.getItem('location')
+  const savedLocation = localStorage.getItem("location");
   if (savedCache) {
     console.log("found cache in localStorage");
     caches = new Map(JSON.parse(savedCache));
-    console.log(caches)
+    console.log(caches);
   }
   if (savedDepositBox) {
     console.log("found depositbox in localStorage");
@@ -313,15 +319,34 @@ function loadFromLocalStorage(): [
     const parsed = JSON.parse(savedInventory);
     inventory = [...parsed];
   }
-  if(savedLocation){
-    console.log('found a location in localStorage')
-    const parsed = JSON.parse(savedLocation)
-    location = {...parsed}
-    console.log(location)
+  if (savedLocation) {
+    console.log("found a location in localStorage");
+    const parsed = JSON.parse(savedLocation);
+    location = { ...parsed };
+    console.log(location);
   }
 
   return [caches, depositBox, inventory, location];
 }
+
+document.getElementById("reset")?.addEventListener("click", () => {
+  const input = prompt(
+    "Are you sure you want to reset the game? This is permanent (a long time!) and cannot be reversed",
+  );
+  if (input !== "y") {
+    return;
+  }
+  caches.clear();
+  depositBox.clear();
+  player.inventory.length = 0;
+  player.line.setLatLngs([]);
+  localStorage.clear();
+  for (const x of cachePopups) {
+    x.clearLayers();
+  }
+  cachePopups.length = 0;
+  generateCache();
+});
 
 document.getElementById("up")?.addEventListener("click", () => {
   movePlayerCommand("up");
