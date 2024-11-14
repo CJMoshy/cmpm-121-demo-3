@@ -231,7 +231,7 @@ function generateCache() {
     }
   }
   visualChunks.push(layer);
-  if (visualChunks.length > 2) {
+  if (visualChunks.length >= 2) {
     const chunkToDelete = visualChunks.shift() as leaflet.LayerGroup;
     chunkToDelete.clearLayers(); // garbage collection will snag this now
   }
