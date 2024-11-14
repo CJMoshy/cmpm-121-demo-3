@@ -43,9 +43,12 @@ leaflet
 // const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
 const [caches, depositBox, inv, location] = loadFromLocalStorage();
 
-// this is a layer group that will hold all the l.rect instances...
-const cachePopups: leaflet.LayerGroup[] = [];
+// this is a layer group array that will hold all the l.rect instances...
+// I visualise this as chunks in minecraft
+// its important to note that this array is treated as a FIFO queue for chunk loading
+const visualChunks: leaflet.LayerGroup[] = [];
 
+// player representation
 const player: Player = {
   marker: leaflet.marker(location.current),
   line: leaflet.polyline([location.current], { color: "blue" }).addTo(map),
@@ -137,11 +140,17 @@ function spawnCache(i: number, j: number) {
 
       coinCountUI.innerHTML = `${player.inventory.length}`;
     };
+    // and then encapsulate that function and the save into one helper as its called on each interaction
+    const handleGenericInteration = () => {
+      updateUserCoinView();
+      saveToLocalStorage();
+    };
 
     // define a unique id to assign to each coin generated
     let UUID = 0;
-    popupDiv
-      .querySelector<HTMLButtonElement>("#deposit")! //
+
+    popupDiv // deposit logic
+      .querySelector<HTMLButtonElement>("#deposit")!
       .addEventListener("click", () => {
         if (player.inventory.length <= 0) {
           alert("No Token in Inventory");
@@ -154,16 +163,15 @@ function spawnCache(i: number, j: number) {
             [token],
           );
         } else {
-          // const token: NFT = player.inventory.pop()!; // add players most recent token to the cache
           const dBox = depositBox.get(HASH)!;
           dBox?.push(token);
           depositBox.set(HASH, dBox);
         }
         document.getElementById("recent")!.textContent =
           `Player deposited token: {${token.i}:${token.j}:${token.serial}}`;
-        updateUserCoinView();
-        saveToLocalStorage();
+        handleGenericInteration();
       });
+
     popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
       .addEventListener("click", () => {
         const dBox = depositBox.get(HASH);
@@ -171,14 +179,14 @@ function spawnCache(i: number, j: number) {
           const token = dBox.pop()!;
           player.inventory.push(token); // give player a token
           depositBox.set(HASH, dBox);
-          updateUserCoinView();
           document.getElementById("recent")!.textContent =
             `Player withdrew token: {${token.i}:${token.j}:${token.serial}}`;
-          saveToLocalStorage();
+          handleGenericInteration();
         } else {
           alert("No Token in Cache");
         }
       });
+    
     popupDiv
       .querySelector<HTMLButtonElement>("#generate")!
       .addEventListener("click", () => {
@@ -192,13 +200,11 @@ function spawnCache(i: number, j: number) {
           j: JHASH.toString(),
           serial: UUID,
         };
-        // console.log("generated a new token", nft);
         document.getElementById("recent")!.textContent =
           `Player generated token: {${nft.i}:${nft.j}:${nft.serial}}`;
         player.inventory.push(nft);
         UUID++; // increment id for next mint
-        updateUserCoinView();
-        saveToLocalStorage();
+        handleGenericInteration();
       });
 
     return popupDiv;
@@ -224,34 +230,30 @@ function generateCache() {
       }
     }
   }
-  cachePopups.push(layer);
-  if (cachePopups.length > 2) {
-    const del = cachePopups.shift() as leaflet.LayerGroup;
-    del.clearLayers();
+  visualChunks.push(layer);
+  if (visualChunks.length > 2) {
+    const chunkToDelete = visualChunks.shift() as leaflet.LayerGroup;
+    chunkToDelete.clearLayers(); // garbage collection will snag this now
   }
 }
 
-function movePlayerCommand(direction: MoveCommand) {
+function movePlayerCommand(direction: DirectionCommand) {
   const { lat, lng } = player.marker.getLatLng();
   switch (direction) {
     case "up":
       player.marker.setLatLng(leaflet.latLng(lat + TILE_DEGREES, lng));
-      player.location.current = player.marker.getLatLng();
       break;
     case "down":
       player.marker.setLatLng(leaflet.latLng(lat - TILE_DEGREES, lng));
-      player.location.current = player.marker.getLatLng();
       break;
     case "left":
       player.marker.setLatLng(leaflet.latLng(lat, lng - TILE_DEGREES));
-      player.location.current = player.marker.getLatLng();
       break;
     case "right":
       player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
-      player.location.current = player.marker.getLatLng();
       break;
   }
-
+  player.location.current = player.marker.getLatLng();
   // derived from formula d = sqrt((x2-x1)^2 + (y2-y1)^2)
   const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
     const xDiff = x2 - x1;
@@ -273,11 +275,10 @@ function movePlayerCommand(direction: MoveCommand) {
   }
   player.line.addLatLng(player.location.current);
   map.panTo(player.marker.getLatLng());
+  saveToLocalStorage();
 }
 
 function saveToLocalStorage() {
-  console.log("saving to local storage");
-  console.log(JSON.stringify(Array.from(caches.entries())));
   localStorage.setItem("cache", JSON.stringify(Array.from(caches.entries())));
   localStorage.setItem(
     "depositBox",
@@ -308,7 +309,6 @@ function loadFromLocalStorage(): [
   if (savedCache) {
     console.log("found cache in localStorage");
     caches = new Map(JSON.parse(savedCache));
-    console.log(caches);
   }
   if (savedDepositBox) {
     console.log("found depositbox in localStorage");
@@ -323,7 +323,6 @@ function loadFromLocalStorage(): [
     console.log("found a location in localStorage");
     const parsed = JSON.parse(savedLocation);
     location = { ...parsed };
-    console.log(location);
   }
 
   return [caches, depositBox, inventory, location];
@@ -341,10 +340,13 @@ document.getElementById("reset")?.addEventListener("click", () => {
   player.inventory.length = 0;
   player.line.setLatLngs([]);
   localStorage.clear();
-  for (const x of cachePopups) {
+  for (const x of visualChunks) {
     x.clearLayers();
   }
-  cachePopups.length = 0;
+  visualChunks.length = 0;
+  document.getElementById("coins")!.innerHTML = player.inventory.length
+    .toString();
+  document.getElementById("recent")!.innerHTML = "";
   generateCache();
 });
 

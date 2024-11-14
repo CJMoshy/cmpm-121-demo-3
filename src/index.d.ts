@@ -26,5 +26,5 @@ declare global {
     location: PlayerLocation;
   }
 
-  type MoveCommand = "up" | "down" | "left" | "right";
+  type DirectionCommand = "up" | "down" | "left" | "right";
 }
