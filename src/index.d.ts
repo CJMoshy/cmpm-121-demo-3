@@ -14,14 +14,15 @@ declare global {
   }
   type Inventory = NFT[];
   type DepositBox = NFT[];
+  interface PlayerLocation{
+    current: LatLng,
+    previous: LatLng
+  }
 
   interface Player {
     marker: Marker;
     inventory: Inventory;
-    location: {
-      current: LatLng;
-      previous: LatLng;
-    };
+    location: PlayerLocation
   }
 
   type MoveCommand = "up" | "down" | "left" | "right";
