@@ -18,7 +18,6 @@ declare global {
   interface Player {
     marker: Marker;
     inventory: Inventory;
-    step: number;
     location: {
       current: LatLng;
       previous: LatLng;
