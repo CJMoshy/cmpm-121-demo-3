@@ -5,6 +5,7 @@ declare global {
   interface Cell {
     readonly i: number;
     readonly j: number;
+    tokenCount: number;
   }
 
   interface NFT {
@@ -12,8 +13,10 @@ declare global {
     j: string;
     serial: number;
   }
+
   type Inventory = NFT[];
   type DepositBox = NFT[];
+
   interface PlayerLocation {
     current: LatLng;
     previous: LatLng;

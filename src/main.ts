@@ -38,23 +38,17 @@ leaflet
   })
   .addTo(map);
 
-// track caches we spawn
-// const caches = new Map<CellHash, Cell>(); // caches we generate
-// const depositBox = new Map<CellHash, DepositBox>(); // each cache will have a deposit box
-const [caches, depositBox, inv, location] = loadFromLocalStorage();
+// caches hold deposit boxes which deal with coins
+// deposit boxes are only created when user deposits a coin
+const [caches, depositBox] = loadExistingCaches();
 
 // this is a layer group array that will hold all the l.rect instances...
 // I visualise this as chunks in minecraft
 // its important to note that this array is treated as a FIFO queue for chunk loading
 const visualChunks: leaflet.LayerGroup[] = [];
 
-// player representation
-const player: Player = {
-  marker: leaflet.marker(location.current),
-  line: leaflet.polyline([location.current], { color: "blue" }).addTo(map),
-  inventory: inv,
-  location: location,
-};
+// load player from local storage if exists
+const player: Player = initPlayer();
 
 // simple ui stuff for user
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
@@ -84,37 +78,37 @@ function spawnCache(i: number, j: number) {
     color: randomColor(),
   });
 
-  // determines how many NFTs each cache can 'mint' or create
-  let availableTokens =
-    Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1;
-
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
   const IHASH = bounds.getCenter().lat / TILE_DEGREES;
   const JHASH = bounds.getCenter().lng / TILE_DEGREES;
   const HASH = IHASH.toString() + JHASH.toString();
 
+  // cell has not been made yet
   if (caches.has(HASH) === false) {
     const cell = {
       i: IHASH,
       j: JHASH,
+      tokenCount: Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1,
     };
     caches.set(HASH, cell);
-  } else {
-    console.log("Cache already exists in memory!");
   }
 
   // Handle interactions with the cache
-  rect.bindPopup(() => {
-    // The popup offers a description and buttons
-    const popupDiv = document.createElement("div");
-    popupDiv.innerHTML = `
+  try {
+    rect.bindPopup(() => {
+      // The popup offers a description and buttons
+      const thisCache = caches.get(HASH);
+      if (!thisCache) throw new Error("Queried cache not found in database");
+
+      const popupDiv = document.createElement("div");
+      popupDiv.innerHTML = `
     <div id='wrapper'>
       <div>
         Cache Location: ${IHASH.toFixed(2)} lat  ${JHASH.toFixed(2)} lng
         <br>
         Available Tokens for Mint: 
         <span id="value">
-          ${availableTokens.toString()}
+          ${thisCache.tokenCount.toString()}
         </span>
       </div>
       <div>
@@ -129,86 +123,87 @@ function spawnCache(i: number, j: number) {
     </div>
     `;
 
-    // helper to update the ui
-    const updateUserCoinView = () => {
-      popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-        availableTokens
-          .toString();
+      // helper to update the ui
+      const updateUserCoinView = () => {
+        popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML = thisCache
+          .tokenCount.toString();
+        popupDiv.querySelector<HTMLSpanElement>("#tokens")!.innerHTML =
+          (depositBox.get(HASH)?.length)?.toString() || "0";
 
-      popupDiv.querySelector<HTMLSpanElement>("#tokens")!.innerHTML =
-        (depositBox.get(HASH)?.length)?.toString() || "0";
+        coinCountUI.innerHTML = `${player.inventory.length}`;
+      };
+      // and then encapsulate that function and the save into one helper as its called on each interaction
+      const handleGenericInteration = () => {
+        updateUserCoinView();
+        saveToLocalStorage();
+      };
 
-      coinCountUI.innerHTML = `${player.inventory.length}`;
-    };
-    // and then encapsulate that function and the save into one helper as its called on each interaction
-    const handleGenericInteration = () => {
-      updateUserCoinView();
-      saveToLocalStorage();
-    };
+      // define a unique id to assign to each coin generated
+      let UUID = 0;
 
-    // define a unique id to assign to each coin generated
-    let UUID = 0;
-
-    popupDiv // deposit logic
-      .querySelector<HTMLButtonElement>("#deposit")!
-      .addEventListener("click", () => {
-        if (player.inventory.length <= 0) {
-          alert("No Token in Inventory");
-          return;
-        }
-        const token: NFT = player.inventory.pop()!; // add players most recent token to the cache
-        if (!depositBox.has(HASH)) { // check if the hash does not have a deposit box already
-          depositBox.set(
-            HASH,
-            [token],
-          );
-        } else {
-          const dBox = depositBox.get(HASH)!;
-          dBox?.push(token);
-          depositBox.set(HASH, dBox);
-        }
-        document.getElementById("recent")!.textContent =
-          `Player deposited token: {${token.i}:${token.j}:${token.serial}}`;
-        handleGenericInteration();
-      });
-
-    popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
-      .addEventListener("click", () => {
-        const dBox = depositBox.get(HASH);
-        if (dBox !== undefined && dBox.length > 0) { // if tokens exist in this caches deposit box
-          const token = dBox.pop()!;
-          player.inventory.push(token); // give player a token
-          depositBox.set(HASH, dBox);
+      popupDiv // deposit logic
+        .querySelector<HTMLButtonElement>("#deposit")!
+        .addEventListener("click", () => {
+          if (player.inventory.length <= 0) {
+            alert("No Token in Inventory");
+            return;
+          }
+          const token: NFT = player.inventory.pop()!; // add players most recent token to the cache
+          if (!depositBox.has(HASH)) { // check if the hash does not have a deposit box already
+            depositBox.set(
+              HASH,
+              [token],
+            );
+          } else {
+            const dBox = depositBox.get(HASH)!;
+            dBox?.push(token);
+            depositBox.set(HASH, dBox);
+          }
           document.getElementById("recent")!.textContent =
-            `Player withdrew token: {${token.i}:${token.j}:${token.serial}}`;
+            `Player deposited token: {${token.i}:${token.j}:${token.serial}}`;
           handleGenericInteration();
-        } else {
-          alert("No Token in Cache");
-        }
-      });
-    
-    popupDiv
-      .querySelector<HTMLButtonElement>("#generate")!
-      .addEventListener("click", () => {
-        if (availableTokens! <= 0) { // can this cache still mint?
-          alert("No Tokens Available for Mint");
-          return;
-        }
-        availableTokens--; // mint one
-        const nft: NFT = {
-          i: IHASH.toString(),
-          j: JHASH.toString(),
-          serial: UUID,
-        };
-        document.getElementById("recent")!.textContent =
-          `Player generated token: {${nft.i}:${nft.j}:${nft.serial}}`;
-        player.inventory.push(nft);
-        UUID++; // increment id for next mint
-        handleGenericInteration();
-      });
+        });
 
-    return popupDiv;
-  });
+      popupDiv.querySelector<HTMLButtonElement>("#withdrawal")!
+        .addEventListener("click", () => {
+          const dBox = depositBox.get(HASH);
+          if (dBox !== undefined && dBox.length > 0) { // if tokens exist in this caches deposit box
+            const token = dBox.pop()!;
+            player.inventory.push(token); // give player a token
+            depositBox.set(HASH, dBox);
+            document.getElementById("recent")!.textContent =
+              `Player withdrew token: {${token.i}:${token.j}:${token.serial}}`;
+            handleGenericInteration();
+          } else {
+            alert("No Token in Cache");
+          }
+        });
+
+      popupDiv
+        .querySelector<HTMLButtonElement>("#generate")!
+        .addEventListener("click", () => {
+          if (thisCache.tokenCount! <= 0) { // can this cache still mint?
+            alert("No Tokens Available for Mint");
+            return;
+          }
+          thisCache.tokenCount--; // mint one
+          const nft: NFT = {
+            i: IHASH.toString(),
+            j: JHASH.toString(),
+            serial: UUID,
+          };
+          document.getElementById("recent")!.textContent =
+            `Player generated token: {${nft.i}:${nft.j}:${nft.serial}}`;
+          player.inventory.push(nft);
+          UUID++; // increment id for next mint
+          handleGenericInteration();
+        });
+
+      return popupDiv;
+    });
+  } catch (e) {
+    console.log(e);
+  }
   return rect;
 }
 
@@ -286,34 +281,21 @@ function saveToLocalStorage() {
   );
   localStorage.setItem("inventory", JSON.stringify(player.inventory));
   localStorage.setItem("location", JSON.stringify(player.location));
+  localStorage.setItem("poly", JSON.stringify(player.line.getLatLngs()));
 }
 
-function loadFromLocalStorage(): [
-  Map<CellHash, Cell>,
-  Map<CellHash, DepositBox>,
-  Inventory,
-  PlayerLocation,
-] {
-  let caches = new Map<CellHash, Cell>(); // caches we generate
-  let depositBox = new Map<CellHash, DepositBox>(); // e
+function initPlayer(): Player {
   let inventory: Inventory = [];
   let location: PlayerLocation = {
     current: SPAWN,
     previous: SPAWN,
   };
-
-  const savedCache = localStorage.getItem("cache");
-  const savedDepositBox = localStorage.getItem("depositBox");
+  const polyLine = leaflet.polyline([location.current], { color: "blue" })
+    .addTo(map);
   const savedInventory = localStorage.getItem("inventory");
   const savedLocation = localStorage.getItem("location");
-  if (savedCache) {
-    console.log("found cache in localStorage");
-    caches = new Map(JSON.parse(savedCache));
-  }
-  if (savedDepositBox) {
-    console.log("found depositbox in localStorage");
-    depositBox = new Map(JSON.parse(savedDepositBox));
-  }
+  const savedPolyline = localStorage.getItem("poly");
+
   if (savedInventory) {
     console.log("found inventory in localStorage");
     const parsed = JSON.parse(savedInventory);
@@ -324,8 +306,38 @@ function loadFromLocalStorage(): [
     const parsed = JSON.parse(savedLocation);
     location = { ...parsed };
   }
+  if (savedPolyline) {
+    console.log("found a polyline");
+    const parsed = JSON.parse(savedPolyline);
+    polyLine.setLatLngs([...parsed]);
+  }
 
-  return [caches, depositBox, inventory, location];
+  return {
+    marker: leaflet.marker(location.current),
+    line: polyLine,
+    inventory: inventory,
+    location: location,
+  } as Player;
+}
+
+function loadExistingCaches(): [
+  Map<CellHash, Cell>,
+  Map<CellHash, DepositBox>,
+] {
+  let caches = new Map<CellHash, Cell>(); // caches we generate
+  let depositBox = new Map<CellHash, DepositBox>(); // e
+
+  const savedCache = localStorage.getItem("cache");
+  const savedDepositBox = localStorage.getItem("depositBox");
+  if (savedCache) {
+    console.log("found cache in localStorage");
+    caches = new Map(JSON.parse(savedCache));
+  }
+  if (savedDepositBox) {
+    console.log("found depositbox in localStorage");
+    depositBox = new Map(JSON.parse(savedDepositBox));
+  }
+  return [caches, depositBox];
 }
 
 document.getElementById("reset")?.addEventListener("click", () => {
