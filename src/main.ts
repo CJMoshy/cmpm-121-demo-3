@@ -342,9 +342,10 @@ function loadExistingCaches(): [
 }
 
 document.getElementById("toggle")?.addEventListener("click", () => {
-  let intervalID;
+  let intervalID: number;
   geoLocale = !geoLocale;
   if (geoLocale && navigator.geolocation) {
+    document.getElementById("controls")!.style.visibility = "hidden";
     // Get the current position
     intervalID = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
@@ -354,14 +355,21 @@ document.getElementById("toggle")?.addEventListener("click", () => {
           console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
           player.marker.setLatLng(leaflet.latLng(latitude, longitude));
           player.location.current = player.marker.getLatLng();
+          player.line.addLatLng(player.location.current);
           map.panTo(player.marker.getLatLng());
+          saveToLocalStorage();
         },
         (error) => {
-          console.error("Error getting location:", error);
+          alert(error.message);
+          clearInterval(intervalID);
         },
       );
     }, 1000);
-  } else clearInterval(intervalID);
+  }
+  if (!geoLocale) {
+    document.getElementById("controls")!.style.visibility = "visible";
+    clearInterval(intervalID!);
+  }
 });
 
 document.getElementById("reset")?.addEventListener("click", () => {
