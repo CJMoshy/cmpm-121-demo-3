@@ -49,6 +49,7 @@ const visualChunks: leaflet.LayerGroup[] = [];
 
 // load player from local storage if exists
 const player: Player = initPlayer();
+let geoLocale: boolean = false;
 
 // simple ui stuff for user
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
@@ -340,11 +341,34 @@ function loadExistingCaches(): [
   return [caches, depositBox];
 }
 
+document.getElementById("toggle")?.addEventListener("click", () => {
+  let intervalID;
+  geoLocale = !geoLocale;
+  if (geoLocale && navigator.geolocation) {
+    // Get the current position
+    intervalID = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          // Access the latitude and longitude coordinates
+          const { latitude, longitude } = position.coords;
+          console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+          player.marker.setLatLng(leaflet.latLng(latitude, longitude));
+          player.location.current = player.marker.getLatLng();
+          map.panTo(player.marker.getLatLng());
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        },
+      );
+    }, 1000);
+  } else clearInterval(intervalID);
+});
+
 document.getElementById("reset")?.addEventListener("click", () => {
-  const input = prompt(
-    "Are you sure you want to reset the game? This is permanent (a long time!) and cannot be reversed",
+  const input = confirm(
+    "[Warning] \nThis is permanent action and cannot be reversed\nAll game state will be reset",
   );
-  if (input !== "y") {
+  if (!input) {
     return;
   }
   caches.clear();

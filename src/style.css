@@ -111,3 +111,9 @@ button:focus-visible {
 .moveBtn {
   font-size: 20px;
 }
+
+.utility {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+}
