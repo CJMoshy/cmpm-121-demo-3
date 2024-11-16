@@ -367,11 +367,15 @@ document.getElementById("toggle")?.addEventListener("click", () => {
           // Access the latitude and longitude coordinates
           const { latitude, longitude } = position.coords;
           console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
-          player.marker.setLatLng(leaflet.latLng(latitude, longitude));
-          player.location.current = player.marker.getLatLng();
-          player.line.addLatLng(player.location.current);
-          map.panTo(player.marker.getLatLng());
+          // player.marker.setLatLng(leaflet.latLng(latitude, longitude));
+          // player.location.current = player.marker.getLatLng();
+          // player.line.addLatLng(player.location.current);
+          // map.panTo(player.marker.getLatLng());
           if (!windowOpen) {
+            player.marker.setLatLng(leaflet.latLng(latitude, longitude));
+            player.location.current = player.marker.getLatLng();
+            player.line.addLatLng(player.location.current);
+            map.panTo(player.marker.getLatLng());
             generateCache();
           }
           // generateCache()
