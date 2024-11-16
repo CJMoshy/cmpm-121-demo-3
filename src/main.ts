@@ -39,8 +39,9 @@ leaflet
   .addTo(map);
 
 // caches hold deposit boxes which deal with coins
+// token count maps each cache with the ammount of tokens it can mint
 // deposit boxes are only created when user deposits a coin
-const [caches, depositBox] = loadExistingCaches();
+const [caches, tokenCounts, depositBox] = loadExistingCaches();
 
 // this is a layer group array that will hold all the l.rect instances...
 // I visualise this as chunks in minecraft
@@ -50,6 +51,7 @@ const visualChunks: leaflet.LayerGroup[] = [];
 // load player from local storage if exists
 const player: Player = initPlayer();
 let geoLocale: boolean = false;
+let windowOpen: boolean = false;
 
 // simple ui stuff for user
 const coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
@@ -57,21 +59,22 @@ coinCountUI.innerHTML = player.inventory.length.toString();
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
-  console.log("sapwning");
   // Convert cell numbers into lat/lng bounds
   const bounds = leaflet.latLngBounds([
-    [ i * TILE_DEGREES, j * TILE_DEGREES],
+    [i * TILE_DEGREES, j * TILE_DEGREES],
     [(i - 1) * TILE_DEGREES, (j - 1) * TILE_DEGREES],
   ]);
 
   // brace made me this... generate random color hex
   // I replaced it with luck to deterministically generate the colors, random colors each time
   // ws proving to be too confusing
+  console.log(i, j);
   const randomColor = () => (
     "#" +
     Array.from(
       { length: 6 },
-      () => "0123456789ABCDEF"[Math.floor(luck([i, j].toString()) * 16)],
+      () =>
+        "0123456789ABCDEF"[Math.floor(luck([i, j].toString() + "HELPER") * 16)],
     ).join("")
   );
   const rect = leaflet.rectangle(bounds, {
@@ -79,8 +82,8 @@ function spawnCache(i: number, j: number) {
   });
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
-  const IHASH = bounds.getCenter().lat / TILE_DEGREES;
-  const JHASH = bounds.getCenter().lng / TILE_DEGREES;
+  const IHASH = Math.floor(bounds.getCenter().lat / TILE_DEGREES);
+  const JHASH = Math.floor(bounds.getCenter().lng / TILE_DEGREES);
   const HASH = IHASH.toString() + JHASH.toString();
 
   // cell has not been made yet
@@ -88,27 +91,31 @@ function spawnCache(i: number, j: number) {
     const cell = {
       i: IHASH,
       j: JHASH,
-      tokenCount: Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1,
     };
     caches.set(HASH, cell);
+    tokenCounts.set(
+      HASH,
+      Math.floor(luck([i, j, "initialValue"].toString()) * 25) + 1,
+    );
   }
 
   // Handle interactions with the cache
   try {
     rect.bindPopup(() => {
+      windowOpen = true;
       // The popup offers a description and buttons
-      const thisCache = caches.get(HASH) as CacheCell;
+      const thisCache = caches.get(HASH);
       if (!thisCache) throw new Error("Queried cache not found in database");
 
       const popupDiv = document.createElement("div");
       popupDiv.innerHTML = `
     <div id='wrapper'>
       <div>
-        Cache Location: ${IHASH.toFixed(2)} lat  ${JHASH.toFixed(2)} lng
+        Cache Location: ${IHASH} lat  ${JHASH} lng
         <br>
         Available Tokens for Mint: 
         <span id="value">
-          ${thisCache.tokenCount.toString()}
+          ${tokenCounts.get(HASH)?.toString()}
         </span>
       </div>
       <div>
@@ -125,8 +132,8 @@ function spawnCache(i: number, j: number) {
 
       // helper to update the ui
       const updateUserCoinView = () => {
-        popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML = thisCache
-          .tokenCount.toString();
+        popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
+          tokenCounts.get(HASH)!.toString();
         popupDiv.querySelector<HTMLSpanElement>("#tokens")!.innerHTML =
           (depositBox.get(HASH)?.length)?.toString() || "0";
 
@@ -182,11 +189,11 @@ function spawnCache(i: number, j: number) {
       popupDiv
         .querySelector<HTMLButtonElement>("#generate")!
         .addEventListener("click", () => {
-          if (thisCache.tokenCount! <= 0) { // can this cache still mint?
+          if (tokenCounts.get(HASH)! <= 0) { // can this cache still mint?
             alert("No Tokens Available for Mint");
             return;
           }
-          thisCache.tokenCount--; // mint one
+          tokenCounts.set(HASH, tokenCounts.get(HASH)! - 1);
           const nft: NFT = {
             i: IHASH.toString(),
             j: JHASH.toString(),
@@ -204,6 +211,9 @@ function spawnCache(i: number, j: number) {
   } catch (e) {
     console.log(e);
   }
+  rect.getPopup()?.on("remove", () => {
+    windowOpen = false;
+  });
   return rect;
 }
 
@@ -222,8 +232,8 @@ function generateCache() {
       // If location i,j is lucky enough, spawn a cache!
       const currentCell = {
         i: i + playerCell.i,
-        j: j + playerCell.j
-      }
+        j: j + playerCell.j,
+      };
       if (
         luck(
           [currentCell.i, currentCell.j]
@@ -268,6 +278,10 @@ function movePlayerCommand(direction: DirectionCommand) {
 
 function saveToLocalStorage() {
   localStorage.setItem("cache", JSON.stringify(Array.from(caches.entries())));
+  localStorage.setItem(
+    "tokenCount",
+    JSON.stringify(Array.from(tokenCounts.entries())),
+  );
   localStorage.setItem(
     "depositBox",
     JSON.stringify(Array.from(depositBox.entries())),
@@ -315,29 +329,37 @@ function initPlayer(): Player {
 
 function loadExistingCaches(): [
   Map<CellHash, Cell>,
+  Map<CellHash, number>,
   Map<CellHash, DepositBox>,
 ] {
   let caches = new Map<CellHash, Cell>(); // caches we generate
+  let tokenCounts = new Map<CellHash, number>(); // each cache can mint some coins
   let depositBox = new Map<CellHash, DepositBox>(); // e
 
   const savedCache = localStorage.getItem("cache");
+  const savedTokens = localStorage.getItem("tokenCount");
   const savedDepositBox = localStorage.getItem("depositBox");
   if (savedCache) {
     console.log("found cache in localStorage");
     caches = new Map(JSON.parse(savedCache));
   }
+  if (savedTokens) {
+    console.log("fond a token count associated with a cache");
+    tokenCounts = new Map(JSON.parse(savedTokens));
+  }
   if (savedDepositBox) {
     console.log("found depositbox in localStorage");
     depositBox = new Map(JSON.parse(savedDepositBox));
   }
-  return [caches, depositBox];
+  return [caches, tokenCounts, depositBox];
 }
 
+let intervalID: number | undefined;
 document.getElementById("toggle")?.addEventListener("click", () => {
-  let intervalID: number;
   geoLocale = !geoLocale;
   if (geoLocale && navigator.geolocation) {
     document.getElementById("controls")!.style.visibility = "hidden";
+    clearInterval(intervalID);
     // Get the current position
     intervalID = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
@@ -349,18 +371,23 @@ document.getElementById("toggle")?.addEventListener("click", () => {
           player.location.current = player.marker.getLatLng();
           player.line.addLatLng(player.location.current);
           map.panTo(player.marker.getLatLng());
+          if (!windowOpen) {
+            generateCache();
+          }
+          // generateCache()
           saveToLocalStorage();
         },
         (error) => {
           alert(error.message);
           clearInterval(intervalID);
+          intervalID = undefined;
         },
       );
     }, 1000);
-  }
-  if (!geoLocale) {
+  } else if (!geoLocale) {
     document.getElementById("controls")!.style.visibility = "visible";
-    clearInterval(intervalID!);
+    clearInterval(intervalID);
+    intervalID = undefined;
   }
 });
 
