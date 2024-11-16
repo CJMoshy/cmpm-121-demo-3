@@ -5,9 +5,11 @@ declare global {
   interface Cell {
     readonly i: number;
     readonly j: number;
+    // tokenCount: number;
+  }
+  interface CacheCell extends Cell {
     tokenCount: number;
   }
-
   interface NFT {
     i: string;
     j: string;

@@ -59,10 +59,9 @@ coinCountUI.innerHTML = player.inventory.length.toString();
 function spawnCache(i: number, j: number) {
   console.log("sapwning");
   // Convert cell numbers into lat/lng bounds
-  const origin = player.marker.getLatLng();
   const bounds = leaflet.latLngBounds([
-    [origin.lat + i * TILE_DEGREES, origin.lng + j * TILE_DEGREES],
-    [origin.lat + (i - 1) * TILE_DEGREES, origin.lng + (j - 1) * TILE_DEGREES],
+    [ i * TILE_DEGREES, j * TILE_DEGREES],
+    [(i - 1) * TILE_DEGREES, (j - 1) * TILE_DEGREES],
   ]);
 
   // brace made me this... generate random color hex
@@ -98,7 +97,7 @@ function spawnCache(i: number, j: number) {
   try {
     rect.bindPopup(() => {
       // The popup offers a description and buttons
-      const thisCache = caches.get(HASH);
+      const thisCache = caches.get(HASH) as CacheCell;
       if (!thisCache) throw new Error("Queried cache not found in database");
 
       const popupDiv = document.createElement("div");
@@ -212,16 +211,26 @@ function generateCache() {
   const layer = leaflet.layerGroup<leaflet.Rectangle>();
   layer.addTo(map);
   // Look around the player's neighborhood for caches to spawn
+  const playerCell: Cell = {
+    i: Math.floor(player.marker.getLatLng().lat / TILE_DEGREES),
+    j: Math.floor(player.marker.getLatLng().lng / TILE_DEGREES),
+  };
+
+  console.log(playerCell);
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
       // If location i,j is lucky enough, spawn a cache!
+      const currentCell = {
+        i: i + playerCell.i,
+        j: j + playerCell.j
+      }
       if (
         luck(
-          [i + player.marker.getLatLng().lat, j + player.marker.getLatLng().lat]
+          [currentCell.i, currentCell.j]
             .toString(),
         ) < CACHE_SPAWN_PROBABILITY
       ) {
-        const rect = spawnCache(i, j);
+        const rect = spawnCache(currentCell.i, currentCell.j);
         rect.addTo(layer);
       }
     }
@@ -250,25 +259,8 @@ function movePlayerCommand(direction: DirectionCommand) {
       break;
   }
   player.location.current = player.marker.getLatLng();
-  // derived from formula d = sqrt((x2-x1)^2 + (y2-y1)^2)
-  const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
-    const xDiff = x2 - x1;
-    const yDiff = y2 - y1;
-    return Number(Math.sqrt(xDiff * xDiff + yDiff * yDiff).toFixed(5));
-  };
 
-  const { current, previous } = player.location;
-  const dist = getDistance(
-    current.lat,
-    current.lng,
-    previous.lat,
-    previous.lng,
-  );
-  if (dist > 0.0005) {
-    previous.lat = current.lat;
-    previous.lng = current.lng;
-    generateCache();
-  }
+  generateCache();
   player.line.addLatLng(player.location.current);
   map.panTo(player.marker.getLatLng());
   saveToLocalStorage();
