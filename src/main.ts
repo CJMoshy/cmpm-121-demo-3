@@ -6,47 +6,40 @@ import "./style.css";
 import "./leafletWorkaround.ts";
 import luck from "./luck.ts";
 
+import { makeLatLng } from "./wrapper.ts";
+import MapService from "./wrapper.ts";
 // define list of spawn points for player
-const spawnLocations = {
-  NULL_ISLAND: leaflet.latLng(0, 0),
-  OAKES_CLASSROOM: leaflet.latLng(36.98949379578401, -122.06277128548504),
+
+const GAME_CONFIG = {
+  spawnLocations: {
+    NULL_ISLAND: makeLatLng(0, 0),
+    OAKES_CLASSROOM: makeLatLng(36.98949379578401, -122.06277128548504),
+  },
+  GAMEPLAY_ZOOM_LEVEL: 19,
+  TILE_DEGREES: 1e-4,
+  NEIGHBORHOOD_SIZE: 8,
+  CACHE_SPAWN_PROBABILITY: 0.05,
 };
-const SPAWN = spawnLocations.OAKES_CLASSROOM;
 
-// Tunable gameplay parameters
-const GAMEPLAY_ZOOM_LEVEL = 19;
-const TILE_DEGREES = 1e-4;
-const NEIGHBORHOOD_SIZE = 8;
-const CACHE_SPAWN_PROBABILITY = 0.05;
+const SPAWN = GAME_CONFIG.spawnLocations.OAKES_CLASSROOM;
 
+const mService = new MapService(document);
 // create the map with leaflet
-const map = leaflet.map(document.getElementById("map")!, {
-  center: SPAWN,
-  zoom: GAMEPLAY_ZOOM_LEVEL,
-  minZoom: GAMEPLAY_ZOOM_LEVEL,
-  maxZoom: GAMEPLAY_ZOOM_LEVEL,
+const map = mService.loadMap({
+  spawn: SPAWN,
+  zoom: GAME_CONFIG.GAMEPLAY_ZOOM_LEVEL,
+  minZoom: GAME_CONFIG.GAMEPLAY_ZOOM_LEVEL,
+  maxZoom: GAME_CONFIG.GAMEPLAY_ZOOM_LEVEL,
   zoomControl: false,
   scrollWheelZoom: false,
 });
-
-// Populate the map with a background tile layer
-leaflet
-  .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  })
-  .addTo(map);
 
 // caches hold deposit boxes which deal with coins
 // token count maps each cache with the ammount of tokens it can mint
 // deposit boxes are only created when user deposits a coin
 const [caches, tokenCounts, depositBox] = loadExistingCaches();
 
-// this is a layer group array that will hold all the l.rect instances...
-// I visualise this as chunks in minecraft
-// its important to note that this array is treated as a FIFO queue for chunk loading
-const visualChunks: leaflet.LayerGroup[] = [];
+const visualChunks = mService.initChunkSystem();
 
 // load player from local storage if exists
 const player: Player = initPlayer();
@@ -60,10 +53,7 @@ coinCountUI.innerHTML = player.inventory.length.toString();
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
   // Convert cell numbers into lat/lng bounds
-  const bounds = leaflet.latLngBounds([
-    [i * TILE_DEGREES, j * TILE_DEGREES],
-    [(i - 1) * TILE_DEGREES, (j - 1) * TILE_DEGREES],
-  ]);
+  const bounds = mService.getLatLngBounds(i, j, GAME_CONFIG.TILE_DEGREES);
 
   // brace made me this... generate random color hex
   // I replaced it with luck to deterministically generate the colors, random colors each time
@@ -77,13 +67,11 @@ function spawnCache(i: number, j: number) {
         "0123456789ABCDEF"[Math.floor(luck([i, j].toString() + "HELPER") * 16)],
     ).join("")
   );
-  const rect = leaflet.rectangle(bounds, {
-    color: randomColor(),
-  });
+  const rect = mService.getRect(bounds, randomColor);
 
   //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
-  const IHASH = Math.floor(bounds.getCenter().lat / TILE_DEGREES);
-  const JHASH = Math.floor(bounds.getCenter().lng / TILE_DEGREES);
+  const IHASH = Math.floor(bounds.getCenter().lat / GAME_CONFIG.TILE_DEGREES);
+  const JHASH = Math.floor(bounds.getCenter().lng / GAME_CONFIG.TILE_DEGREES);
   const HASH = IHASH.toString() + JHASH.toString();
 
   // cell has not been made yet
@@ -218,17 +206,25 @@ function spawnCache(i: number, j: number) {
 }
 
 function generateCache() {
-  const layer = leaflet.layerGroup<leaflet.Rectangle>();
+  const layer = mService.getLayerGroup();
   layer.addTo(map);
   // Look around the player's neighborhood for caches to spawn
   const playerCell: Cell = {
-    i: Math.floor(player.marker.getLatLng().lat / TILE_DEGREES),
-    j: Math.floor(player.marker.getLatLng().lng / TILE_DEGREES),
+    i: Math.floor(player.marker.getLatLng().lat / GAME_CONFIG.TILE_DEGREES),
+    j: Math.floor(player.marker.getLatLng().lng / GAME_CONFIG.TILE_DEGREES),
   };
 
   console.log(playerCell);
-  for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-    for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
+  for (
+    let i = -GAME_CONFIG.NEIGHBORHOOD_SIZE;
+    i < GAME_CONFIG.NEIGHBORHOOD_SIZE;
+    i++
+  ) {
+    for (
+      let j = -GAME_CONFIG.NEIGHBORHOOD_SIZE;
+      j < GAME_CONFIG.NEIGHBORHOOD_SIZE;
+      j++
+    ) {
       // If location i,j is lucky enough, spawn a cache!
       const currentCell = {
         i: i + playerCell.i,
@@ -238,7 +234,7 @@ function generateCache() {
         luck(
           [currentCell.i, currentCell.j]
             .toString(),
-        ) < CACHE_SPAWN_PROBABILITY
+        ) < GAME_CONFIG.CACHE_SPAWN_PROBABILITY
       ) {
         const rect = spawnCache(currentCell.i, currentCell.j);
         rect.addTo(layer);
@@ -256,19 +252,19 @@ function movePlayerCommand(direction: DirectionCommand) {
   const { lat, lng } = player.marker.getLatLng();
   switch (direction) {
     case "up":
-      player.marker.setLatLng(leaflet.latLng(lat + TILE_DEGREES, lng));
+      player.marker.setLatLng(makeLatLng(lat + GAME_CONFIG.TILE_DEGREES, lng));
       break;
     case "down":
-      player.marker.setLatLng(leaflet.latLng(lat - TILE_DEGREES, lng));
+      player.marker.setLatLng(makeLatLng(lat - GAME_CONFIG.TILE_DEGREES, lng));
       break;
     case "left":
-      player.marker.setLatLng(leaflet.latLng(lat, lng - TILE_DEGREES));
+      player.marker.setLatLng(makeLatLng(lat, lng - GAME_CONFIG.TILE_DEGREES));
       break;
     case "right":
-      player.marker.setLatLng(leaflet.latLng(lat, lng + TILE_DEGREES));
+      player.marker.setLatLng(makeLatLng(lat, lng + GAME_CONFIG.TILE_DEGREES));
       break;
   }
-  player.location.current = player.marker.getLatLng();
+  player.location.current = makeLatLng(lat, lng);
 
   generateCache();
   player.line.addLatLng(player.location.current);
@@ -297,7 +293,7 @@ function initPlayer(): Player {
     current: SPAWN,
     previous: SPAWN,
   };
-  const polyLine = leaflet.polyline([location.current], { color: "blue" })
+  const polyLine = mService.getPolyline(location)
     .addTo(map);
   const savedInventory = localStorage.getItem("inventory");
   const savedLocation = localStorage.getItem("location");
@@ -320,18 +316,14 @@ function initPlayer(): Player {
   }
 
   return {
-    marker: leaflet.marker(location.current),
+    marker: mService.getMarker(location),
     line: polyLine,
     inventory: inventory,
     location: location,
   } as Player;
 }
 
-function loadExistingCaches(): [
-  Map<CellHash, Cell>,
-  Map<CellHash, number>,
-  Map<CellHash, DepositBox>,
-] {
+function loadExistingCaches(): InitialCache {
   let caches = new Map<CellHash, Cell>(); // caches we generate
   let tokenCounts = new Map<CellHash, number>(); // each cache can mint some coins
   let depositBox = new Map<CellHash, DepositBox>(); // e
@@ -367,18 +359,16 @@ document.getElementById("toggle")?.addEventListener("click", () => {
           // Access the latitude and longitude coordinates
           const { latitude, longitude } = position.coords;
           console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
-          // player.marker.setLatLng(leaflet.latLng(latitude, longitude));
-          // player.location.current = player.marker.getLatLng();
-          // player.line.addLatLng(player.location.current);
-          // map.panTo(player.marker.getLatLng());
           if (!windowOpen) {
-            player.marker.setLatLng(leaflet.latLng(latitude, longitude));
-            player.location.current = player.marker.getLatLng();
+            player.marker.setLatLng(makeLatLng(latitude, longitude));
+            player.location.current = makeLatLng(
+              player.marker.getLatLng().lat,
+              player.marker.getLatLng().lng,
+            );
             player.line.addLatLng(player.location.current);
             map.panTo(player.marker.getLatLng());
             generateCache();
           }
-          // generateCache()
           saveToLocalStorage();
         },
         (error) => {

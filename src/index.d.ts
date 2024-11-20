@@ -1,6 +1,8 @@
-import { LatLng, Marker, Polyline } from "types/leaflet";
+import { Marker, Polyline } from "types/leaflet";
 
 declare global {
+  type LatLng = [number, number];
+
   type CellHash = string;
   interface Cell {
     readonly i: number;
@@ -29,4 +31,19 @@ declare global {
   }
 
   type DirectionCommand = "up" | "down" | "left" | "right";
+
+  type InitialCache = [
+    Map<CellHash, Cell>,
+    Map<CellHash, number>,
+    Map<CellHash, DepositBox>,
+  ];
+
+  interface MapConfig {
+    spawn: LatLng;
+    zoom: number;
+    minZoom: number;
+    maxZoom: number;
+    zoomControl: boolean;
+    scrollWheelZoom: boolean;
+  }
 }
