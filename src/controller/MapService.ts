@@ -2,12 +2,12 @@
 
 import leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "./leafletWorkaround.ts";
+import "../leafletWorkaround.ts";
 
 export const makeLatLng = (lat: number, lng: number) =>
   leaflet.latLng(lat, lng) as unknown as LatLng;
 
-class MapService {
+export default class MapService {
   private doc: Document;
 
   constructor(doc: Document) {
@@ -48,7 +48,7 @@ class MapService {
     return leaflet.polyline([location.current], { color: "blue" });
   }
 
-  getMarker(location: PlayerLocation) {
+  initMarker(location: PlayerLocation) {
     return new leaflet.Marker(location.current);
   }
 
@@ -64,5 +64,3 @@ class MapService {
     return leaflet.rectangle(bounds, { color: color() });
   }
 }
-
-export default MapService;
