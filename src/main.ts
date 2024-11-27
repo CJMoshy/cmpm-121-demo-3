@@ -36,10 +36,10 @@ function main() {
     scrollWheelZoom: false,
   });
 
-  // load player from local storage if exists
-  PlayerController.mRef = map;
-  PlayerController.mService = mService;
-  const player = new PlayerController(SPAWN);
+  // load player
+  const player = new PlayerController(SPAWN, mService, map);
+
+  //TODO FIX
   let geoLocale: boolean = false;
 
   // following SOLID here, Single responsibility means delegating different/unrelated parts of the program to different modules
@@ -49,7 +49,8 @@ function main() {
     player,
   );
 
-  PlayerController.cacheM = cacheM;
+  player.setCacheManager(cacheM);
+
   // simple ui stuff for user
   // all of this exists statically on the UI manager
   // this pattern was suggested by brace, and while I understand it,

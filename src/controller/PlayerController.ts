@@ -10,20 +10,26 @@ export default class PlayerController {
   public location: PlayerLocation;
   public marker: leaflet.Marker;
   public polyLine: leaflet.Polyline;
-  public static mService: MapService;
-  public static mRef: leaflet.Map;
-  public static cacheM: CacheManager;
+  private mService: MapService;
+  private mRef: leaflet.Map;
+  private cacheM?: CacheManager;
 
-  constructor(spawn: LatLng) {
+  constructor(
+    spawn: LatLng,
+    mService: MapService,
+    mRef: leaflet.Map,
+  ) {
+    this.mService = mService;
+    this.mRef = mRef;
     this.inventory = [];
     this.location = {
       current: spawn,
       previous: spawn,
     };
-    this.marker = PlayerController.mService.initMarker(this.location);
+    this.marker = this.mService.initMarker(this.location);
 
-    this.polyLine = PlayerController.mService.getPolyline(this.location)
-      .addTo(PlayerController.mRef);
+    this.polyLine = this.mService.getPolyline(this.location)
+      .addTo(this.mRef);
 
     const savedInventory = localStorage.getItem("inventory");
     const savedLocation = localStorage.getItem("location");
@@ -46,6 +52,10 @@ export default class PlayerController {
       const parsed = JSON.parse(savedPolyline);
       this.polyLine.setLatLngs([...parsed]);
     }
+  }
+
+  setCacheManager(cacheM: CacheManager) {
+    this.cacheM = cacheM;
   }
 
   savePlayerState() {
@@ -81,12 +91,12 @@ export default class PlayerController {
     }
     this.location.current = makeLatLng(lat, lng);
 
-    PlayerController.cacheM.generateCache(
-      PlayerController.mRef,
+    this.cacheM?.generateCache(
+      this.mRef,
     );
     this.polyLine.addLatLng(this.location.current);
-    PlayerController.mRef.panTo(this.marker.getLatLng());
-    PlayerController.cacheM.saveToLocalStorage();
+    this.mRef.panTo(this.marker.getLatLng());
+    this.cacheM?.saveToLocalStorage();
     this.savePlayerState();
   }
 }
