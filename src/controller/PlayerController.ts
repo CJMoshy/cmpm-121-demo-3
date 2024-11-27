@@ -24,6 +24,7 @@ export default class PlayerController {
 
     this.polyLine = PlayerController.mService.getPolyline(this.location)
       .addTo(PlayerController.mRef);
+
     const savedInventory = localStorage.getItem("inventory");
     const savedLocation = localStorage.getItem("location");
     const savedPolyline = localStorage.getItem("poly");
@@ -32,17 +33,26 @@ export default class PlayerController {
       console.log("found inventory in localStorage");
       const parsed = JSON.parse(savedInventory);
       this.inventory = [...parsed];
+      console.log(this.inventory);
     }
     if (savedLocation) {
       console.log("found a location in localStorage");
       const parsed = JSON.parse(savedLocation);
       this.location = { ...parsed };
+      this.marker.setLatLng(this.location.current);
     }
     if (savedPolyline) {
       console.log("found a polyline");
       const parsed = JSON.parse(savedPolyline);
       this.polyLine.setLatLngs([...parsed]);
     }
+  }
+
+  savePlayerState() {
+    console.log("saving inv", this.inventory);
+    localStorage.setItem("inventory", JSON.stringify(this.inventory));
+    localStorage.setItem("location", JSON.stringify(this.location));
+    localStorage.setItem("poly", JSON.stringify(this.polyLine.getLatLngs()));
   }
 
   movePlayerCommand(direction: DirectionCommand) {
@@ -77,5 +87,6 @@ export default class PlayerController {
     this.polyLine.addLatLng(this.location.current);
     PlayerController.mRef.panTo(this.marker.getLatLng());
     PlayerController.cacheM.saveToLocalStorage();
+    this.savePlayerState();
   }
 }

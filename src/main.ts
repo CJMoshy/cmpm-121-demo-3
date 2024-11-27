@@ -80,6 +80,7 @@ function main() {
               );
             }
             cacheM.saveToLocalStorage();
+            player.savePlayerState();
           },
           (error) => {
             alert(error.message);

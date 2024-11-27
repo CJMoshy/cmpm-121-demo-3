@@ -53,6 +53,7 @@ export default class UIManager {
     const handleGenericInteration = () => {
       updateUserCoinView();
       cacheManager.saveToLocalStorage();
+      player.savePlayerState();
     };
 
     // define a unique id to assign to each coin generated
