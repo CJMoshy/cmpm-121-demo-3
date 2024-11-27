@@ -6,17 +6,30 @@ import CacheManager from "./CacheManager.ts";
 import PlayerController from "./PlayerController.ts";
 
 export default class UIManager {
-  public static coinCountUI: HTMLDivElement;
-  public static windowOpen: boolean;
-  public static visualChunks: leaflet.LayerGroup[];
-  static createPopup(
+  private coinCountUI: HTMLDivElement;
+  public windowOpen: boolean;
+  private visualChunks: leaflet.LayerGroup[];
+
+  //deno-lint-ignore no-explicit-any
+  constructor(coinCountUI: HTMLDivElement, visualChunks: any[]) { // remove leaflet coupling with any[] as opposed to leaflet.LayerGroup[]
+    this.coinCountUI = coinCountUI;
+    this.visualChunks = visualChunks;
+    this.windowOpen = false;
+  }
+
+  getVisualChunks() {
+    return this.visualChunks;
+  }
+  setCoinCountUI(inv: Inventory) {
+    this.coinCountUI.innerHTML = inv.length.toString();
+  }
+  createPopup(
     IHASH: string,
     JHASH: string,
     HASH: string,
     cacheManager: CacheManager,
     player: PlayerController,
   ): HTMLDivElement {
-    this.windowOpen = true;
     const popupDiv = document.createElement("div");
     popupDiv.innerHTML = `
       <div id='wrapper'>

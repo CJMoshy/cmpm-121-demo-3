@@ -36,6 +36,15 @@ function main() {
     scrollWheelZoom: false,
   });
 
+  // simple ui stuff for user
+  // all of this exists statically on the UI manager
+  // this pattern was suggested by brace, and while I understand it,
+  // I likely would have passed more into the constructor
+  const UIManagerInstance = new UIManager(
+    document.querySelector<HTMLDivElement>("#coins")!,
+    mService.initChunkSystem(),
+  );
+
   // load player
   const player = new PlayerController(SPAWN, mService, map);
 
@@ -47,18 +56,11 @@ function main() {
     CacheManager.loadExistingCaches(),
     mService,
     player,
+    UIManagerInstance,
   );
 
   player.setCacheManager(cacheM);
-
-  // simple ui stuff for user
-  // all of this exists statically on the UI manager
-  // this pattern was suggested by brace, and while I understand it,
-  // I likely would have passed more into the constructor
-  UIManager.visualChunks = mService.initChunkSystem();
-  UIManager.coinCountUI = document.querySelector<HTMLDivElement>("#coins")!;
-  UIManager.coinCountUI.innerHTML = player.inventory.length.toString();
-
+  UIManagerInstance.setCoinCountUI(player.inventory);
   let intervalID: number | undefined;
   document.getElementById("toggle")?.addEventListener("click", () => {
     geoLocale = !geoLocale;
@@ -72,7 +74,7 @@ function main() {
             // Access the latitude and longitude coordinates
             const { latitude, longitude } = position.coords;
             console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
-            if (!UIManager.windowOpen) {
+            if (!UIManagerInstance.windowOpen) {
               player.marker.setLatLng(makeLatLng(latitude, longitude));
               player.location.current = makeLatLng(
                 player.marker.getLatLng().lat,
@@ -113,10 +115,10 @@ function main() {
     player.inventory.length = 0;
     player.polyLine.setLatLngs([]);
     localStorage.clear();
-    for (const x of UIManager.visualChunks) {
+    for (const x of UIManagerInstance.getVisualChunks()) {
       x.clearLayers();
     }
-    UIManager.visualChunks.length = 0;
+    UIManagerInstance.getVisualChunks().length = 0;
     document.getElementById("coins")!.innerHTML = player.inventory.length
       .toString();
     document.getElementById("recent")!.innerHTML = "";

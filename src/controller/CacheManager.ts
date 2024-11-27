@@ -18,12 +18,14 @@ export default class CacheManager {
   public depositBox: Map<CellHash, DepositBox>;
   private player: PlayerController;
   private mService: MapService;
-
+  private uim: UIManager;
   constructor(
     existingState: CacheState | null = null,
     mService: MapService,
     player: PlayerController,
+    uim: UIManager,
   ) {
+    this.uim = uim;
     this.mService = mService;
     this.player = player;
     if (existingState) {
@@ -127,7 +129,7 @@ export default class CacheManager {
     // Handle interactions with the cache
     try {
       rect.bindPopup(() =>
-        UIManager.createPopup(
+        this.uim.createPopup(
           IHASH.toString(),
           JHASH.toString(),
           HASH,
@@ -139,7 +141,7 @@ export default class CacheManager {
       console.log(e);
     }
     rect.getPopup()?.on("remove", () => {
-      UIManager.windowOpen = false;
+      this.uim.windowOpen = false;
     });
     return rect;
   }
@@ -186,9 +188,9 @@ export default class CacheManager {
         }
       }
     }
-    UIManager.visualChunks.push(layer);
-    if (UIManager.visualChunks.length >= 2) {
-      const chunkToDelete = UIManager.visualChunks
+    this.uim.getVisualChunks().push(layer);
+    if (this.uim.getVisualChunks().length >= 2) {
+      const chunkToDelete = this.uim.getVisualChunks()
         .shift() as leaflet.LayerGroup;
       chunkToDelete.clearLayers(); // garbage collection will snag this now
     }
