@@ -16,10 +16,16 @@ export default class CacheManager {
   public caches: Map<CellHash, Cell>;
   public tokenCounts: Map<CellHash, number>;
   public depositBox: Map<CellHash, DepositBox>;
-  public static player: PlayerController;
-  public static mService: MapService;
+  private player: PlayerController;
+  private mService: MapService;
 
-  constructor(existingState: CacheState | null = null) {
+  constructor(
+    existingState: CacheState | null = null,
+    mService: MapService,
+    player: PlayerController,
+  ) {
+    this.mService = mService;
+    this.player = player;
     if (existingState) {
       this.caches = existingState.caches;
       this.tokenCounts = existingState.tokenCounts;
@@ -78,7 +84,7 @@ export default class CacheManager {
 
   spawnCache(i: number, j: number): leaflet.Rectangle {
     // Convert cell numbers into lat/lng bounds
-    const bounds = CacheManager.mService.getLatLngBounds(
+    const bounds = this.mService.getLatLngBounds(
       i,
       j,
       GAME_CONFIG.TILE_DEGREES,
@@ -98,7 +104,7 @@ export default class CacheManager {
           ],
       ).join("")
     );
-    const rect = CacheManager.mService.getRect(bounds, randomColor);
+    const rect = this.mService.getRect(bounds, randomColor);
 
     //store info about cache so we can give it statefulness ONLY IF IT HAS NOT BEEN MADE
     const IHASH = Math.floor(bounds.getCenter().lat / GAME_CONFIG.TILE_DEGREES);
@@ -126,7 +132,7 @@ export default class CacheManager {
           JHASH.toString(),
           HASH,
           this,
-          CacheManager.player,
+          this.player,
         )
       );
     } catch (e) {
@@ -141,15 +147,15 @@ export default class CacheManager {
   generateCache(
     map: leaflet.Map,
   ): void {
-    const layer = CacheManager.mService.getLayerGroup();
+    const layer = this.mService.getLayerGroup();
     layer.addTo(map);
     // Look around the player's neighborhood for caches to spawn
     const playerCell: Cell = {
       i: Math.floor(
-        CacheManager.player.marker.getLatLng().lat / GAME_CONFIG.TILE_DEGREES,
+        this.player.marker.getLatLng().lat / GAME_CONFIG.TILE_DEGREES,
       ),
       j: Math.floor(
-        CacheManager.player.marker.getLatLng().lng / GAME_CONFIG.TILE_DEGREES,
+        this.player.marker.getLatLng().lng / GAME_CONFIG.TILE_DEGREES,
       ),
     };
 

@@ -24,9 +24,7 @@ function main() {
   // map service provider is now wrapped in its own class to reduce coupling
   const mService = new MapService(document);
 
-  // following SOLID here, Single responsibility means delegating different/unrelated parts of the program to different modules
-  const cacheM = new CacheManager(CacheManager.loadExistingCaches());
-  CacheManager.mService = mService; // the controllers still often need references to the other controllers and parts of them, so all these references are public static
+  // the controllers still often need references to the other controllers and parts of them, so all these references are public static
 
   // create the map with the mapService provider (leaflet)
   const map = mService.loadMap({
@@ -39,13 +37,19 @@ function main() {
   });
 
   // load player from local storage if exists
-  PlayerController.cacheM = cacheM;
   PlayerController.mRef = map;
   PlayerController.mService = mService;
   const player = new PlayerController(SPAWN);
-  CacheManager.player = player;
   let geoLocale: boolean = false;
 
+  // following SOLID here, Single responsibility means delegating different/unrelated parts of the program to different modules
+  const cacheM = new CacheManager(
+    CacheManager.loadExistingCaches(),
+    mService,
+    player,
+  );
+
+  PlayerController.cacheM = cacheM;
   // simple ui stuff for user
   // all of this exists statically on the UI manager
   // this pattern was suggested by brace, and while I understand it,
