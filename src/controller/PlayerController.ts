@@ -89,7 +89,9 @@ export default class PlayerController {
         );
         break;
     }
-    this.location.current = makeLatLng(lat, lng);
+
+    const latLng = this.marker.getLatLng();
+    this.location.current = makeLatLng(latLng.lat, latLng.lng);
 
     this.cacheM?.generateCache(
       this.mRef,
